@@ -15,7 +15,7 @@ class HGRNBitConfig(PretrainedConfig):
         vocab_size: int = 32000,
         hidden_size: int = 2048,
         num_hidden_layers: int = 24,
-        attn_mode: str = "fused_recurrent",
+        attn_mode: str = "naive_recurrent",
         num_heads: Optional[int] = 1,
         expand_ratio: Optional[int] = 1,
         use_short_conv: bool = False,
@@ -33,7 +33,7 @@ class HGRNBitConfig(PretrainedConfig):
         eos_token_id: int = 2,
         tie_word_embeddings: bool = False,
         initializer_range: float = 0.02,
-        fuse_cross_entropy: bool = True,
+        fuse_cross_entropy: bool = False,
         **kwargs
     ):
         self.vocab_size = vocab_size

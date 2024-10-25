@@ -13,17 +13,17 @@ from transformers.cache_utils import Cache
 
 from mmfreelm.modules import FusedRMSNormSwishGate, ShortConvolution
 from mmfreelm.modules.activations import swiglu
-from mmfreelm.ops.hgrn.recurrent_fuse import fused_recurrent_hgrn
-
+# from mmfreelm.ops.hgrn.recurrent_fuse import fused_recurrent_hgrn
+from mmfreelm.ops.hgrn.naive import naive_recurrent_hgrn
 #from mmfreelm.ops.bitnet import BitLinear_Fuse as BitLinear
-from mmfreelm.ops.fusedbitnet import FusedBitLinear as BitLinear
+from mmfreelm.ops.bitnet import BitLinear as BitLinear
 
 
 class HGRNBitAttention(nn.Module):
 
     def __init__(
         self,
-        mode: str = 'fused_recurrent',
+        mode: str = 'naive_recurrent',
         hidden_size: int = 1024,
         num_heads: Optional[int] = None,
         expand_ratio: Optional[int] = 1,
@@ -50,7 +50,7 @@ class HGRNBitAttention(nn.Module):
 
         self.layer_idx = layer_idx
 
-        assert mode in ['fused_recurrent'], f"Not suppoerted mode `{mode}`."
+        assert mode in ['naive_recurrent'], f"Not suppoerted mode `{mode}`."
         assert self.hidden_size % num_heads == 0, f"hidden size must be divisible by num_heads of {num_heads}"
 
         self.i_proj = BitLinear(hidden_size, self.input_dim, bias=False)
@@ -91,7 +91,7 @@ class HGRNBitAttention(nn.Module):
         **kwargs
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Cache]]:
         # launching the triton kernel for just one token will actually be slower
-        mode = 'fused_recurrent' if hidden_states.shape[1] == 1 else self.mode
+        mode = 'naive_recurrent' if hidden_states.shape[1] == 1 else self.mode
 
         last_state = past_key_values[self.layer_idx] if use_cache else None
         if self.use_short_conv:
@@ -121,8 +121,8 @@ class HGRNBitAttention(nn.Module):
         i, f = map(lambda x: rearrange(x, 'b l (h d) -> b h l d', h=self.num_heads), (i, f))
 
         recurrent_state = last_state[-1] if use_cache else None
-        if mode == 'fused_recurrent':
-            o, recurrent_state = fused_recurrent_hgrn(i, f, initial_state=recurrent_state, output_final_state=use_cache)
+        if mode == 'naive_recurrent':
+            o, recurrent_state = naive_recurrent_hgrn(i, f, initial_state=recurrent_state, output_final_state=use_cache)
         else:
             raise NotImplementedError(f"Not supported mode `{mode}`.")
 

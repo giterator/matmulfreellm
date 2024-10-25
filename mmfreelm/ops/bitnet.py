@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import triton
-import triton.language as tl
+# import triton
+# import triton.language as tl
 from mmfreelm.modules import RMSNorm
-from mmfreelm.modules.layernorm import RMSNormLinear
+# from mmfreelm.modules.layernorm import RMSNormLinear
 
 
 def activation_quant(x):

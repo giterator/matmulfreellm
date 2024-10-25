@@ -18,10 +18,11 @@ from transformers.utils import logging
 from mmfreelm.layers.hgrn_bit import HGRNBitAttention
 from mmfreelm.models.hgrn_bit.configuration_hgrn_bit import HGRNBitConfig
 from mmfreelm.models.utils import RecurrentCache
-from mmfreelm.modules import FusedCrossEntropyLoss, RMSNorm
+# from mmfreelm.modules import FusedCrossEntropyLoss, RMSNorm
+from mmfreelm.modules import RMSNorm
 from mmfreelm.modules.activations import swiglu_linear, swiglu
 #from mmfreelm.ops.bitnet import BitLinear_Fuse as BitLinear
-from mmfreelm.ops.fusedbitnet import FusedBitLinear as BitLinear
+from mmfreelm.ops.bitnet import BitLinear as BitLinear
 
 logger = logging.get_logger(__name__)
 
