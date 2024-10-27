@@ -4,7 +4,7 @@ import mmfreelm
 from mmfreelm.models.hgrn_bit.configuration_hgrn_bit import HGRNBitConfig
 from transformers import AutoModelForCausalLM, AutoTokenizer
 #Change here to our open-sourced model
-name = 'ridger/MMfreeLM-1.3B'
+name = 'ridger/MMfreeLM-370M'
 tokenizer = AutoTokenizer.from_pretrained(name)
 model = AutoModelForCausalLM.from_pretrained(name).cuda().half()
 input_prompt = "In a shocking finding, scientist discovered a herd of unicorns living in a remote, "
