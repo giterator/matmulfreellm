@@ -248,6 +248,7 @@ class HGRNBitModel(HGRNBitPreTrainedModel):
                     lower_bound
                 )
             else:
+                # print(f"Layer {i}")
                 hidden_states, attentions, past_key_values = layer(
                     hidden_states,
                     attention_mask=attention_mask,
@@ -256,11 +257,13 @@ class HGRNBitModel(HGRNBitPreTrainedModel):
                     output_attentions=output_attentions,
                     lower_bound=lower_bound
                 )
+                # print(hidden_states)
 
             if output_attentions:
                 all_attns += (attentions,)
-
+        # print("Layers complete")
         hidden_states = self.norm(hidden_states)
+        # print(hidden_states)
 
         # add hidden states from the last decoder layer
         if output_hidden_states:
@@ -271,6 +274,8 @@ class HGRNBitModel(HGRNBitPreTrainedModel):
             next_cache = past_key_values.to_legacy_cache()
         if not return_dict:
             return tuple(x for x in [hidden_states, next_cache, all_hidden_states, all_attns] if x is not None)
+        
+        # print("Before return")
         return BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
             past_key_values=next_cache,
@@ -284,6 +289,7 @@ class HGRNBitForCausalLM(HGRNBitPreTrainedModel):
 
     def __init__(self, config):
         super().__init__(config)
+        # config.attn_mode = "naive_recurrent"
         self.model = HGRNBitModel(config)
         self.vocab_size = config.vocab_size
         self.lm_head = BitLinear(config.hidden_size, config.vocab_size, bias=False)

@@ -612,7 +612,7 @@ class RMSNorm(nn.Module):
         return s
 
     def forward(self, x, residual=None, prenorm=False, residual_in_fp32=False):
-        return rms_norm_ref(x=x, weight=self.weight, bias=self.bias, residual=residual, eps=self.eps, prenorm=prenorm)
+        return layer_norm_ref(x=x, weight=self.weight, bias=self.bias, residual=residual, eps=self.eps, prenorm=prenorm)
         # return rms_norm_fn(
         #     x,
         #     self.weight,
