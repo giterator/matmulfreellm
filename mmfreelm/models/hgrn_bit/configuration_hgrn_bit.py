@@ -62,3 +62,5 @@ class HGRNBitConfig(PretrainedConfig):
             tie_word_embeddings=tie_word_embeddings,
             **kwargs,
         )
+
+        self.attn_mode = "naive_recurrent"
