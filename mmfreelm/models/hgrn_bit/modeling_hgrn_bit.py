@@ -56,7 +56,7 @@ class HGRNBitMLP(nn.Module):
     def forward(self, x):
         y = self.gate_proj(x)
         gate, y = y.chunk(2, -1)
-        z = self.down_proj(swiglu(gate, y))
+        z = self.down_proj(y)
         return z
 
 

@@ -91,7 +91,7 @@ class HGRNBitAttention(nn.Module):
         **kwargs
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Cache]]:
         # launching the triton kernel for just one token will actually be slower
-        mode = 'naive_recurrent' if hidden_states.shape[1] == 1 else self.mode
+        mode = 'naive_recurrent' #if hidden_states.shape[1] == 1 else self.mode
 
         last_state = past_key_values[self.layer_idx] if use_cache else None
         if self.use_short_conv:
