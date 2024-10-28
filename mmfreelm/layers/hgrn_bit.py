@@ -114,7 +114,7 @@ class HGRNBitAttention(nn.Module):
         # the lower bound for the first layer is zero
         if lower_bound is not None and self.layer_idx > 0:
             f = lower_bound + (1 - lower_bound) * f
-        i = swiglu(i, 1 - f)
+        # i = swiglu(i, 1 - f)
         # dealing with left-padding
         if attention_mask is not None:
             i = i.mul_(attention_mask.unsqueeze(-1))
