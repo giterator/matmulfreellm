@@ -10,6 +10,24 @@ import pycuda.driver as cuda
 import pycuda.autoinit
 import sys
 
+
+import time
+import json
+import sys
+import csv
+import numpy as np
+from typing import List, Tuple, Union
+from tqdm import tqdm
+from jtop import jtop
+import multiprocessing
+from multiprocessing import Process, Value
+
+power_sample_period = 0.0005
+runs = 10
+throw_out = 0.25
+verbose = True
+
+
 def get_numpy_dtype(trt_dtype):
     """Convert TensorRT dtype to numpy dtype"""
     mapping = {
@@ -92,7 +110,7 @@ class TRTEngine:
         # Create CUDA stream
         self.stream = cuda.Stream()
 
-    def infer(self, input_dict):
+    def infer(self, input_dict, tok_count):
         """
         Run inference on input data.
         Args:
@@ -129,32 +147,78 @@ class TRTEngine:
 ############################################################
         #Wrap with profiling code
 
-        # Run inference
-        self.context.execute_async_v2(
-            bindings=self.bindings,
-            stream_handle=self.stream.handle
-        )
-        #########################################
+        warm_up = int(runs * throw_out)
+        total = 0
 
-        # Transfer outputs from GPU
-        outputs = {}
-        for idx, output_name in enumerate(self.output_names):
-            # Transfer from GPU to host memory
-            cuda.memcpy_dtoh_async(
-                self.host_outputs[idx], 
-                self.cuda_outputs[idx], 
-                self.stream
+        manager = multiprocessing.Manager()
+        power_samples = manager.list()
+        inference_done = Value('i', 1)
+
+        def poll_power():
+            jetson = jtop()
+            jetson.start()
+
+            while inference_done.value == 0:
+                power_samples.append(jetson.power["rail"]["VDD_CPU_GPU_CV"]["power"])
+                time.sleep(power_sample_period) #e.g. 0.0005 is 0.5 ms -> power sampling rate
+            jetson.close()
+
+        start = time.time()
+
+        for i in tqdm(range(runs), disable=not verbose, desc="Benchmarking"):
+            if i == warm_up:
+                ###########################################
+                inference_done.value = 0
+                power_process = Process(target=poll_power)
+                power_process.start()
+                ###########################################
+                self.stream.synchronize()
+                total = 0
+                start = time.time()
+
+
+            # Run inference
+            self.context.execute_async_v2(
+                bindings=self.bindings,
+                stream_handle=self.stream.handle
             )
-        
-        # Synchronize
+
+            # Transfer outputs from GPU
+            outputs = {}
+            for idx, output_name in enumerate(self.output_names):
+                # Transfer from GPU to host memory
+                cuda.memcpy_dtoh_async(
+                    self.host_outputs[idx], 
+                    self.cuda_outputs[idx], 
+                    self.stream
+                )
+
+            total += batch_size
+
         self.stream.synchronize()
-        
-        # Copy to output dict and reshape
-        for idx, output_name in enumerate(self.output_names):
-            shape = self.binding_shapes[output_name]
-            outputs[output_name] = np.array(self.host_outputs[idx]).reshape(shape)
-        
-        return outputs
+
+        end = time.time()
+        ##########################################################
+        inference_done.value = 1
+        ##########################################################
+        elapsed = end - start
+
+        throughput = tok_count * total / elapsed #tok/s
+
+        ##############################################
+        latency = elapsed / (tok_count * total) # per tok
+        avg_power = np.mean(power_samples) #avg power consumption in mW
+        avg_power /= 1000 #avg power consumption in W
+        #avg_power = round(avg_power, 2) # W, 2 dp
+        #print("Average power consumed (W):", avg_power)
+        energy = avg_power * latency # energy per token
+        ###################################
+
+        if verbose:
+            print(f"Latency per token: {latency:.2f} s, Throughput: {throughput:.2f} tok/s, Power: {avg_power:.2f} W, Energy per token: {energy:.2f} J/tok")
+
+        return latency, throughput, avg_power, energy
+
     
     def __del__(self):
         """Cleanup cuda memory"""
@@ -192,19 +256,6 @@ if __name__ == "__main__":
     
     # Run inference
     print("\nRunning inference...")
-    outputs = engine.infer(sample_inputs)
-    
-    # Print shapes
-    print("\nResults:")
-    print("Input shapes:", {name: arr.shape for name, arr in sample_inputs.items()})
-    print("Output shapes:", {name: arr.shape for name, arr in outputs.items()})
-
-#    print(outputs["output"].shape)
-
-    output = np.argmax(outputs["output"], axis=2)
-    output = output.astype(int).tolist()
-##
-    generated_texts = tokenizer.batch_decode(output, skip_special_tokens=True)
-#
-    for prompt, generated in zip(input_prompts, generated_texts):
-        print(f"Prompt: {prompt}\nGenerated: {generated}\n")
+    tok_count = len(input_prompts[0])
+    print("Sequence lenth: ", tok_count)
+    latency, throughput, avg_power, energy = engine.infer(sample_inputs, tok_count)
