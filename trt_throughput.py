@@ -232,13 +232,14 @@ class TRTEngine:
             print(f"Error during cleanup: {e}")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         print("Usage: python script.py path/to/model.engine")
         sys.exit(1)
         
     engine_path = sys.argv[1]
     name = sys.argv[2]
     batch_size = int(sys.argv[3])
+    tok_count = int(sys.argv[4])
 
     tokenizer = AutoTokenizer.from_pretrained(name)
     input_prompts = ["In a shocking finding, scientist discovered a herd of unicorns living in a remote, "] * batch_size
@@ -246,16 +247,15 @@ if __name__ == "__main__":
 
     # Initialize engine
     engine = TRTEngine(engine_path)
-    
+
     # Create sample input
     sample_inputs = {}
     for input_name in engine.input_names:
         shape = engine.binding_shapes[input_name]
         dtype = engine.binding_dtypes[input_name]
         sample_inputs[input_name] = input_ids.astype(dtype) #np.random.randn(*shape).astype(dtype)
-    
+
     # Run inference
     print("\nRunning inference...")
-    tok_count = len(input_prompts[0])
     print("Sequence lenth: ", tok_count)
     latency, throughput, avg_power, energy = engine.infer(sample_inputs, tok_count)
