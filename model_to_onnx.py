@@ -61,13 +61,13 @@ dummy_output = torch.zeros(
 torch.onnx.export(model,
                   inputs['input_ids'],
                   "mmfreelm_370M.onnx",
-                  opset_version=17, #14
+                  opset_version=14, #14
                   input_names=['input_ids'],
                   output_names=['output'],
-                  dynamic_axes={
-        'input': {0: 'batch_size', 1: 'token_length'},  # Specify dynamic axes
-        # 'output': {0: 'batch_size', 1: "output_sequence_length"}
-                  },
+        #           dynamic_axes={
+        # 'input': {0: 'batch_size', 1: 'token_length'},  # Specify dynamic axes
+        # # 'output': {0: 'batch_size', 1: "output_sequence_length"}
+        #           },
         do_constant_folding=True,
         export_params=True,
         operator_export_type=torch.onnx.OperatorExportTypes.ONNX_FALLTHROUGH,
