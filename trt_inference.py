@@ -121,7 +121,7 @@ class TRTEngine:
                 data = data.astype(self.binding_dtypes[input_name])
             
             # Copy to pagelocked memory
-            np.copyto(self.host_inputs[idx], data.ravel())
+            np.copyto(self.host_inputs[idx], data.ravel().reshape(self.host_inputs[idx].shape))
             
             # Transfer to GPU
             cuda.memcpy_htod_async(self.cuda_inputs[idx], self.host_inputs[idx], self.stream)
