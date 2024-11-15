@@ -9,8 +9,10 @@ import numpy as np
 import pycuda.driver as cuda
 import pycuda.autoinit
 import sys
-
-
+import torch
+import pynvml
+pynvml.nvmlInit()
+import threading
 import time
 import json
 import sys
@@ -19,10 +21,22 @@ import numpy as np
 from typing import List, Tuple, Union
 from tqdm import tqdm
 # from jtop import jtop
-import multiprocessing
-from multiprocessing import Process, Value
+# import multiprocessing
+# from multiprocessing import Process, Value
 
-# power_sample_period = 0.0005
+# Define GPU power sampling function
+def get_gpu_power_usage():
+    power_usage_mW = torch.cuda.power_draw()
+    return power_usage_mW
+ 
+# Define function to sample power usage periodically
+def power_sampling_thread(sample_interval, stop_event, power_readings):
+    while not stop_event.is_set():
+        power_readings.append(get_gpu_power_usage())
+        time.sleep(sample_interval)
+
+        
+power_sample_period = 0.0005
 runs = 10
 throw_out = 0.25
 verbose = True
@@ -155,27 +169,17 @@ class TRTEngine:
         warm_up = int(runs * throw_out)
         total = 0
 
-        # manager = multiprocessing.Manager()
-        # power_samples = manager.list()
-        # inference_done = Value('i', 1)
-
-        # def poll_power():
-        #     jetson = jtop()
-        #     jetson.start()
-
-        #     while inference_done.value == 0:
-        #         power_samples.append(jetson.power["rail"]["VDD_CPU_GPU_CV"]["power"])
-        #         time.sleep(power_sample_period) #e.g. 0.0005 is 0.5 ms -> power sampling rate
-        #     jetson.close()
+        power_samples = []
 
         start = time.time()
 
         for i in tqdm(range(runs), disable=not verbose, desc="Benchmarking"):
             if i == warm_up:
                 ###########################################
-                # inference_done.value = 0
-                # power_process = Process(target=poll_power)
-                # power_process.start()
+                power_samples = []
+                stop_event = threading.Event()
+                thread = threading.Thread(target=power_sampling_thread, args=(power_sample_period, stop_event, power_samples))
+                thread.start()
                 ###########################################
                 self.stream.synchronize()
                 total = 0
@@ -204,7 +208,8 @@ class TRTEngine:
 
         end = time.time()
         ##########################################################
-        # inference_done.value = 1
+        stop_event.set()
+        thread.join()
         ##########################################################
         elapsed = end - start
 
@@ -212,16 +217,16 @@ class TRTEngine:
 
         ##############################################
         latency = elapsed / (tok_count * total) # per tok
-        # avg_power = np.mean(power_samples) #avg power consumption in mW
-        # avg_power /= 1000 #avg power consumption in W
-        #avg_power = round(avg_power, 2) # W, 2 dp
-        #print("Average power consumed (W):", avg_power)
-        # energy = avg_power * latency # energy per token
+        avg_power = np.mean(power_samples) #avg power consumption in mW
+        avg_power /= 1000 #avg power consumption in W
+        avg_power = round(avg_power, 2) # W, 2 dp
+        # print("Average power consumed (W):", avg_power)
+        energy = avg_power * latency # energy per token
         ###################################
 
         if verbose:
-            print(f"Latency per token: {latency:.2f} s, Throughput: {throughput:.2f} tok/s")
-        return latency, throughput
+            print(f"Latency per token: {latency:.2f} s, Throughput: {throughput:.2f} tok/s, Power: {avg_power:.2f} W, Energy per token: {energy:.2f} J/tok")
+        return latency, throughput, avg_power, energy
 
     
     def __del__(self):
@@ -262,4 +267,4 @@ if __name__ == "__main__":
     # Run inference
     print("\nRunning inference...")
     print("Sequence lenth: ", tok_count)
-    latency, throughput = engine.infer(sample_inputs, tok_count)
+    latency, throughput, avg_power, energy = engine.infer(sample_inputs, tok_count)
